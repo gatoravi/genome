@@ -209,7 +209,7 @@ sub all_backends {
 
 sub scopes {
     if ($ENV{GENOME_SYS_ID} && $ENV{GENOME_SYS_ID} ne 'GMS1') {
-        return;
+        return ('site', 'unknown');
     } else {
         return ('site', 'tgisan', 'unknown');
     }
