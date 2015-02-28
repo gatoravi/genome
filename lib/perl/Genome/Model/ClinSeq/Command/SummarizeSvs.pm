@@ -19,7 +19,7 @@ class Genome::Model::ClinSeq::Command::SummarizeSvs {
         },
         cancer_annotation_db => {
             is => 'Genome::Db::Tgi::CancerAnnotation',
-            example_values => [$Genome::Model::ClinSeq::DEFAULT_CANCER_ANNOTATION_DB_ID],
+            example_values => 'tgi/cancer-annotation/human/build37-20150205.1',
             doc => 'cancer annotation data',
         },
         outdir => {
