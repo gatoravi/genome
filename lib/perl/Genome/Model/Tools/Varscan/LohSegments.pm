@@ -132,14 +132,14 @@ sub execute {                               # replace with real execution logic.
             my @lineContents = split(/\t/, $line);
             my $chrom = $lineContents[0];
             my $pos = $lineContents[1];
-            my $nreads1 = $lineContents[5];
-            my $nreads2 = $lineContents[6];
-            my $nfreq = $lineContents[7];
-            my $treads1 = $lineContents[9];
-            my $treads2 = $lineContents[10];
-            my $tfreq = $lineContents[11];
-            my $status = $lineContents[13];
-            my $diff_p_value = $lineContents[15];
+            my $nreads1 = $lineContents[4];
+            my $nreads2 = $lineContents[5];
+            my $nfreq = $lineContents[6];
+            my $treads1 = $lineContents[8];
+            my $treads2 = $lineContents[9];
+            my $tfreq = $lineContents[10];
+            my $status = $lineContents[12];
+            my $diff_p_value = $lineContents[14];
             
             my $normal_cov = $nreads1 + $nreads2;
             my $tumor_cov = $treads1 + $treads2;
@@ -283,7 +283,6 @@ sub execute {                               # replace with real execution logic.
         print OUTFILE qq{
 library(DNAcopy)
 CNA.object <- CNA(snp\$status[snp\$chrom=="$chrom"], snp\$chrom[snp\$chrom=="$chrom"], snp\$position[snp\$chrom=="$chrom"], data.type="binary", sampleid=c("Chromosome $chrom"))
-if(nrow(CNA.object == 0)) quit()
 png("$outfile", height=300, width=800)
 maxpos <- max(snp\$pos[snp\$chrom=="$chrom"])
 segment.CNA.object <- segment(CNA.object)
