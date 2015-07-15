@@ -2,6 +2,7 @@ package Genome::Model::ClinSeq::Command::GenerateSciclonePlots;
 
 use strict;
 use warnings;
+use Statistics::Basic::Median;
 use Genome;
 
 class Genome::Model::ClinSeq::Command::GenerateSciclonePlots {
@@ -101,6 +102,19 @@ sub __errors__ {
     return @errors;
 }
 
+sub median {
+    my $self = shift;
+    my $array_ref = shift;
+    my $len = shift;
+    my $median;
+    if($len % 2) {
+        $median = $$array_ref[($len + 1) / 2];
+    } else {
+        $median = $$array_ref[$len / 2] + $$array_ref[$len / 2 + 1];
+    }
+    return $median;
+}
+
 sub parse_variant_file {
     my $self = shift;
     my $clinseq_build = shift;
@@ -131,6 +145,39 @@ sub parse_variant_file {
             input => $variant_file,
         );
         my $out_data;
+        my $lc = 0;
+        my @coverage;
+        while (my $data = $reader->next) {
+            if(rand() > 0.1) { #A 10 percent sample should be good.
+                next;
+            }
+            my $ref_rc = $data->{$tumor_prefix . "_ref_count"};
+            my $var_rc = $data->{$tumor_prefix . "_var_count"};
+            push @coverage, ($ref_rc + $var_rc);
+            if(++$lc == 10000) { #max sample size of 10k
+                last;
+            }
+        }
+        @coverage = sort {$a <=> $b} @coverage;
+        my $median = $self->median(\@coverage, $lc);
+        my @deviations = map { abs($_ - $median) } @coverage;
+        @deviations = sort {$a <=> $b} @deviations;
+        #Assume normally distributed coverage
+        my $mad = 1.4826 * $self->median(\@deviations, $lc);
+        $self->status_message("Median is $median");
+        $self->status_message("MAD is $mad");
+
+        my $large_list = 0;
+        my $variant_fraction = 1;
+        if($lc == 10000) { #Atleast 100,000 sites
+            $large_list = 1;
+            $variant_fraction = 0.1;
+            $self->status_message("Too many sites, just look at " .
+                                    "$variant_fraction of variants.");
+        }
+
+        $reader->reset;
+        my $outliers = 0;
         while (my $data = $reader->next) {
             unless ($data->{type} =~ /SNP/) {
                 next;
@@ -144,12 +191,20 @@ sub parse_variant_file {
             if ($gender ne "female" and $data->{chromosome_name} =~ /X/) {
                 next;
             }
+            if($large_list and rand() > $variant_fraction) { #Too many sites, just look at a small sample
+                next;
+            }
+            my $ref_rc = $data->{$tumor_prefix . "_ref_count"};
+            my $var_rc = $data->{$tumor_prefix . "_var_count"};
+            my $coverage = $ref_rc + $var_rc;
+            if($coverage > $median + 2 * $mad or $coverage < $median - 2 * $mad) {
+                $outliers++;
+                next;
+            }
             $out_data->{chr} = $data->{chromosome_name};
             $out_data->{pos} = $data->{start};
             $out_data->{ref_allele} = $data->{reference};
             $out_data->{var_allele} = $data->{variant};
-            my $ref_rc = $data->{$tumor_prefix . "_ref_count"};
-            my $var_rc = $data->{$tumor_prefix . "_var_count"};
             my $vaf = $data->{$tumor_prefix . "_VAF"};
             if(not $ref_rc and not $var_rc  and not $vaf) {
                 die $self->error_message("Unable to find ref, alt readcounts and vaf for ".
@@ -170,6 +225,7 @@ sub parse_variant_file {
             $writer->write_one($out_data);
         }
         $variant_files{$tumor_prefix} = $variant_file_temp;
+        $self->status_message("The number of outliers removed is $outliers");
     }
     return %variant_files;
 }
